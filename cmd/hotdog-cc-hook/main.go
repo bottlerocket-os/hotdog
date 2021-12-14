@@ -19,7 +19,7 @@ func main() {
 }
 
 func _main() error {
-	configBytes, err := ioutil.ReadFile("config")
+	configBytes, err := ioutil.ReadFile("config.json")
 	if err != nil {
 		return err
 	}
