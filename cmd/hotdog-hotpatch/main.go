@@ -118,6 +118,7 @@ func runHotpatch(j *jvm) error {
 	version, ok := findVersion(j)
 	if !ok {
 		logger.Printf("Unsupported Java version %q", version)
+		return nil
 	}
 	var options []string
 	switch version {
@@ -137,6 +138,8 @@ func runHotpatch(j *jvm) error {
 		}
 		patchPath := filepath.Join(hotdog.HotdogContainerDir, hotdog.HotdogJDK8Patch)
 		options = append(jvmOpts, "-cp", filepath.Join(basedir, "lib", "tools.jar")+":"+patchPath, hotdog.HotdogJDK8Class, strconv.Itoa(j.pid))
+	default:
+		return nil
 	}
 	patch := exec.Command(j.path, options...)
 	out, err := patch.CombinedOutput()
