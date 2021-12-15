@@ -25,6 +25,10 @@ func _main() error {
 	}
 	var state specs.State
 	err = json.Unmarshal(stdinBytes, &state)
+	if err != nil {
+		return err
+	}
+
 	hotpatch := exec.Command("nsenter",
 		"-t", strconv.Itoa(state.Pid),
 		"-m", "-n", "-i", "-u", "-p",
