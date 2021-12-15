@@ -52,4 +52,7 @@ and set the appropriate configuration.
 When runc sets up the container, it invokes `hotdog-cc-hook`.  `hotdog-cc-hook`
 copies the hotpatch files into the container's filesystem at `/.hotdog`.  After
 the main container process starts, runc invokes `hotdog-poststart-hook`, which
-finds running JVMs and inserts the hotpatch into them.
+uses `nsenter` to enter the container's namespaces and fork off a
+`hotdog-hotpatch` process.  `hotdog-hotpatch` runs several times with
+decreasing frequency (currently 1s, 5s, 10s, 30s) to detect and hotpach JVMs
+inside the container.
