@@ -9,11 +9,19 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bottlerocket/hotdog"
 )
 
 var jvmOpts = []string{"-Xint", "-XX:+UseSerialGC"}
+var delays = []time.Duration{
+	0,
+	time.Second,
+	5 * time.Second,
+	10 * time.Second,
+	30 * time.Second,
+}
 
 const processName = "java"
 
@@ -39,13 +47,18 @@ func _main() error {
 		return err
 	}
 	logger = log.New(logFile, "", log.LstdFlags|log.LUTC)
+	logger.Println("Starting hotpatch")
 
-	jvms := findJVMs()
-	for _, j := range jvms {
-		fmt.Println(j)
-		err := runHotpatch(j)
-		if err != nil {
-			logger.Printf("Patching %d failed: %v", j.pid, err)
+	for _, d := range delays {
+		time.Sleep(d)
+		logger.Printf("Starting hotpatch after %v delay", d)
+		jvms := findJVMs()
+		for _, j := range jvms {
+			fmt.Println(j)
+			err := runHotpatch(j)
+			if err != nil {
+				logger.Printf("Patching %d failed: %v", j.pid, err)
+			}
 		}
 	}
 	return nil

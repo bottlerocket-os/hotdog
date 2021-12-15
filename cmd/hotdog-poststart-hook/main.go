@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -30,9 +29,5 @@ func _main() error {
 		"-t", strconv.Itoa(state.Pid),
 		"-m", "-n", "-i", "-u", "-p",
 		filepath.Join(hotdog.HotdogContainerDir, "hotdog-hotpatch"))
-	out, err := hotpatch.CombinedOutput()
-	if len(out) > 0 {
-		fmt.Println(string(out))
-	}
-	return err
+	return hotpatch.Start()
 }
