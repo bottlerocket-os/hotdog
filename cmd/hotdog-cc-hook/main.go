@@ -31,11 +31,15 @@ func _main() error {
 		return errors.New("undefined root path")
 	}
 	dest := filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)
-	if stat, err := os.Stat(filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)); err == os.ErrNotExist {
+	if stat, err := os.Stat(filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)); err != nil {
+		if _, ok := err.(*os.PathError); !ok {
+			// cannot hotpatch
+			return nil
+		}
 		if err := os.Mkdir(filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir), 0755); err != nil {
 			return err
 		}
-	} else if err != nil || !stat.IsDir() {
+	} else if !stat.IsDir() {
 		// cannot hotpatch
 		return nil
 	}
