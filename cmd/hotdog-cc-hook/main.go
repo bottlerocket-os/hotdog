@@ -48,6 +48,9 @@ func _main() error {
 	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK17Patch), filepath.Join(dest, hotdog.HotdogJDK17Patch)); err != nil {
 		return err
 	}
+	if err := cp(filepath.Join(hotdog.HotdogDirectory, "hotdog-hotpatch"), filepath.Join(dest, "hotdog-hotpatch")); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -3,7 +3,7 @@ all: hooks
 SOURCES := $(shell find . -name '*.go')
 
 .PHONY: hooks
-hooks: bin/hotdog-cc-hook bin/hotdog-poststart-hook bin/hotdog-poststop-hook
+hooks: bin/hotdog-cc-hook bin/hotdog-poststart-hook bin/hotdog-poststop-hook bin/hotdog-hotpatch
 
 bin/hotdog-cc-hook: $(SOURCES) go.mod go.sum
 	go build -mod=readonly -o bin/hotdog-cc-hook ./cmd/hotdog-cc-hook
@@ -21,6 +21,7 @@ install: hooks
 	install bin/hotdog-cc-hook /usr/local/bin
 	install bin/hotdog-poststart-hook /usr/local/bin
 	install bin/hotdog-poststop-hook /usr/local/bin
+	install -D bin/hotdog-hotpatch /usr/libexec/hotdog
 
 clean:
 	rm -rf bin

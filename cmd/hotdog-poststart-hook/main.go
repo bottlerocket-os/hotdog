@@ -1,0 +1,38 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+
+	"github.com/bottlerocket/hotdog"
+	"github.com/opencontainers/runtime-spec/specs-go"
+)
+
+func main() {
+	if err := _main(); err != nil {
+		panic(err)
+	}
+}
+
+func _main() error {
+	stdinBytes, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		return err
+	}
+	var state specs.State
+	err = json.Unmarshal(stdinBytes, &state)
+	hotpatch := exec.Command("nsenter",
+		"-t", strconv.Itoa(state.Pid),
+		"-m", "-n", "-i", "-u", "-p",
+		filepath.Join(hotdog.HotdogContainerDir, "hotdog-hotpatch"))
+	out, err := hotpatch.CombinedOutput()
+	if len(out) > 0 {
+		fmt.Println(string(out))
+	}
+	return err
+}
