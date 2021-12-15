@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -24,7 +25,7 @@ const (
 	java8  jvmVersion = "8"
 )
 
-var logger = log.Default()
+var logger *log.Logger
 
 func main() {
 	if err := _main(); err != nil {
@@ -57,7 +58,7 @@ type jvm struct {
 }
 
 func findJVMs() []*jvm {
-	proc, err := os.ReadDir("/proc")
+	proc, err := ioutil.ReadDir("/proc")
 	if err != nil {
 		return nil
 	}
@@ -66,11 +67,11 @@ func findJVMs() []*jvm {
 		if !p.IsDir() {
 			continue
 		}
-		cmdline, err := os.ReadFile(filepath.Join("/proc", p.Name(), "cmdline"))
+		cmdline, err := ioutil.ReadFile(filepath.Join("/proc", p.Name(), "cmdline"))
 		if err != nil {
 			continue
 		}
-		cmd := strings.SplitN(string(cmdline), string(0), 2)[0]
+		cmd := strings.SplitN(string(cmdline), string(rune(0)), 2)[0]
 		if filepath.Base(cmd) != processName {
 			continue
 		}
