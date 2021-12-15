@@ -42,7 +42,7 @@ func main() {
 }
 
 func _main() error {
-	logFile, err := os.OpenFile(filepath.Join("/", ".hotdog", "hotdog.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	logFile, err := os.OpenFile(filepath.Join(hotdog.HotdogContainerDir, "hotdog.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		return err
 	}

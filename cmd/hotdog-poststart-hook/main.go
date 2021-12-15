@@ -1,15 +1,12 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 
 	"github.com/bottlerocket/hotdog"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/bottlerocket/hotdog/hook"
 )
 
 func main() {
@@ -19,12 +16,7 @@ func main() {
 }
 
 func _main() error {
-	stdinBytes, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		return err
-	}
-	var state specs.State
-	err = json.Unmarshal(stdinBytes, &state)
+	state, err := hook.State()
 	if err != nil {
 		return err
 	}

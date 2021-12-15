@@ -2,7 +2,7 @@ package hotdog
 
 var (
 	HotdogDirectory    = "/usr/libexec/hotdog"
-	HotdogContainerDir = "/.hotdog"
+	HotdogContainerDir = "/dev/shm/.hotdog"
 	HotdogJDK8Patch    = "jdk8-Log4jHotPatch.jar"
 	HotdogJDK8Class    = "Log4jHotPatch"
 	HotdogJDK11Patch   = "jdk11-Log4jHotPatch.jar"
