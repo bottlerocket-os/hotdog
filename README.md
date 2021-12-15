@@ -23,10 +23,10 @@ and set the appropriate configuration.
         "path": "/usr/local/bin/hotdog-cc-hook"
       }],
       "poststart": [{
-        "path": "/usr/local/bin/hotdog-cc-hook"
+        "path": "/usr/local/bin/hotdog-poststart-hook"
       }],
       "poststop": [{
-        "path": "/usr/local/bin/hotdog-cc-hook"
+        "path": "/usr/local/bin/hotdog-poststop-hook"
       }]
     }
   }
@@ -49,4 +49,7 @@ and set the appropriate configuration.
 
 ## How it works
 
-When 
+When runc sets up the container, it invokes `hotdog-cc-hook`.  `hotdog-cc-hook`
+copies the hotpatch files into the container's filesystem at `/.hotdog`.  After
+the main container process starts, runc invokes `hotdog-poststart-hook`, which
+finds running JVMs and inserts the hotpatch into them.

@@ -30,9 +30,14 @@ func _main() error {
 	if spec.Root == nil || len(spec.Root.Path) == 0 {
 		return errors.New("undefined root path")
 	}
-	dest := filepath.Join(spec.Root.Path, ".hotdog")
-	if err := os.Mkdir(filepath.Join(spec.Root.Path, ".hotdog"), 0755); err != nil {
-		return err
+	dest := filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)
+	if stat, err := os.Stat(filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)); err == os.ErrNotExist {
+		if err := os.Mkdir(filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir), 0755); err != nil {
+			return err
+		}
+	} else if err != nil || !stat.IsDir() {
+		// cannot hotpatch
+		return nil
 	}
 	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK8Patch), filepath.Join(dest, hotdog.HotdogJDK8Patch)); err != nil {
 		return err
