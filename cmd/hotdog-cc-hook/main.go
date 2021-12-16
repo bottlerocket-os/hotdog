@@ -63,16 +63,10 @@ func reexeced_main() error {
 	if err := os.Mkdir(hotdogBundleDir, 0755); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK8Patch), filepath.Join(hotdogBundleDir, hotdog.JDK8Patch)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.PatchPath), filepath.Join(hotdogBundleDir, hotdog.PatchPath)); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK11Patch), filepath.Join(hotdogBundleDir, hotdog.JDK11Patch)); err != nil {
-		return err
-	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK17Patch), filepath.Join(hotdogBundleDir, hotdog.JDK17Patch)); err != nil {
-		return err
-	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, "hotdog-hotpatch")); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, hotdog.HotpatchBinary)); err != nil {
 		return err
 	}
 
