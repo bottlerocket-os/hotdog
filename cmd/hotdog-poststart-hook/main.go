@@ -24,6 +24,6 @@ func _main() error {
 	hotpatch := exec.Command("nsenter",
 		"-t", strconv.Itoa(state.Pid),
 		"-m", "-n", "-i", "-u", "-p",
-		filepath.Join(hotdog.HotdogContainerDir, "hotdog-hotpatch"))
+		filepath.Join(hotdog.ContainerDir, hotdog.HotpatchBinary))
 	return hotpatch.Start()
 }

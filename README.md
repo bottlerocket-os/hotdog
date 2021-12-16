@@ -12,9 +12,8 @@ and set the appropriate configuration.
 * Copy `jdk8-Log4jHotPatch.jar` to `/usr/libexec/hotdog`
 * Copy `jdk11-Log4jHotPatch.jar` to `/usr/libexec/hotdog`
 * Copy `jdk17-Log4jHotPatchFat.jar` to `/usr/libexec/hotdog`
-* Run `make install` to install `hotdog-cc-hook`, `hotdog-poststart-hook`, and
-  `hotdog-poststop-hook` to `/usr/local/bin` and to install `hotdog-hotpatch`
-  to `/usr/libexec/hotdog`
+* Run `make install` to install `hotdog-cc-hook`, `hotdog-poststart-hook`, to
+  `/usr/local/bin` and to install `hotdog-hotpatch` to `/usr/libexec/hotdog`
 * Install `oci-add-hooks`
 * Configure `oci-add-hooks` as by writing the following contents to
   `/etc/hotdog/config.json`:
@@ -26,9 +25,6 @@ and set the appropriate configuration.
       }],
       "poststart": [{
         "path": "/usr/local/bin/hotdog-poststart-hook"
-      }],
-      "poststop": [{
-        "path": "/usr/local/bin/hotdog-poststop-hook"
       }]
     }
   }

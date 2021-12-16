@@ -1,12 +1,13 @@
 package hotdog
 
 var (
-	HotdogDirectory    = "/usr/libexec/hotdog"
-	HotdogContainerDir = "/dev/shm/.hotdog"
-	HotdogJDK8Patch    = "jdk8-Log4jHotPatch.jar"
-	HotdogJDK8Class    = "Log4jHotPatch"
-	HotdogJDK11Patch   = "jdk11-Log4jHotPatch.jar"
-	HotdogJDK11Class   = "Log4jHotPatch"
-	HotdogJDK17Patch   = "jdk17-Log4jHotPatchFat.jar"
-	HotdogJDK17Class   = "Log4jHotPatch17"
+	HostDir        = "/usr/libexec/hotdog"
+	ContainerDir   = "/dev/shm/.hotdog"
+	JDK8Patch      = "jdk8-Log4jHotPatch.jar"
+	JDK8Class      = "Log4jHotPatch"
+	JDK11Patch     = "jdk11-Log4jHotPatch.jar"
+	JDK11Class     = "Log4jHotPatch"
+	JDK17Patch     = "jdk17-Log4jHotPatchFat.jar"
+	JDK17Class     = "Log4jHotPatch17"
+	HotpatchBinary = "hotdog-hotpatch"
 )

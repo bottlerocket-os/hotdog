@@ -63,20 +63,20 @@ func reexeced_main() error {
 	if err := os.Mkdir(hotdogBundleDir, 0755); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK8Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK8Patch)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK8Patch), filepath.Join(hotdogBundleDir, hotdog.JDK8Patch)); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK11Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK11Patch)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK11Patch), filepath.Join(hotdogBundleDir, hotdog.JDK11Patch)); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK17Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK17Patch)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.JDK17Patch), filepath.Join(hotdogBundleDir, hotdog.JDK17Patch)); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HotdogDirectory, "hotdog-hotpatch"), filepath.Join(hotdogBundleDir, "hotdog-hotpatch")); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, "hotdog-hotpatch")); err != nil {
 		return err
 	}
 
-	mountTarget := filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)
+	mountTarget := filepath.Join(spec.Root.Path, hotdog.ContainerDir)
 	if stat, err := os.Stat(mountTarget); err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			// cannot hotpatch
