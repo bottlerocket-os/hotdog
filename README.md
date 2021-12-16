@@ -9,9 +9,8 @@ containers.
 To install Hotdog, you need to copy the following files to the right location
 and set the appropriate configuration.
 
-* Copy `jdk8-Log4jHotPatch.jar` to `/usr/share/hotdog`
-* Copy `jdk11-Log4jHotPatch.jar` to `/usr/share/hotdog`
-* Copy `jdk17-Log4jHotPatchFat.jar` to `/usr/share/hotdog`
+* Copy `Log4jHotPatch.jar` to `/usr/share/hotdog` (if you build the hotpatch
+  from source, you'll find it in `build/libs`)
 * Run `make install` to install `hotdog-cc-hook`, `hotdog-poststart-hook`, to
   `/usr/libexec/hotdog` and to install `hotdog-hotpatch` to `/usr/share/hotdog`
 * Install `oci-add-hooks`
