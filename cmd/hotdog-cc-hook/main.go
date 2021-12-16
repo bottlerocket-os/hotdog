@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,23 +58,54 @@ func reexeced_main() error {
 	if spec.Root == nil || len(spec.Root.Path) == 0 {
 		return errors.New("undefined root path")
 	}
-	dest := filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)
-	if stat, err := os.Stat(dest); err != nil {
+
+	hotdogBundleDir := filepath.Join(bundle, "hotdog")
+	if err := os.Mkdir(hotdogBundleDir, 0755); err != nil {
+		return err
+	}
+	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK8Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK8Patch)); err != nil {
+		return err
+	}
+	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK11Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK11Patch)); err != nil {
+		return err
+	}
+	if err := cp(filepath.Join(hotdog.HotdogDirectory, hotdog.HotdogJDK17Patch), filepath.Join(hotdogBundleDir, hotdog.HotdogJDK17Patch)); err != nil {
+		return err
+	}
+	if err := cp(filepath.Join(hotdog.HotdogDirectory, "hotdog-hotpatch"), filepath.Join(hotdogBundleDir, "hotdog-hotpatch")); err != nil {
+		return err
+	}
+
+	mountTarget := filepath.Join(spec.Root.Path, hotdog.HotdogContainerDir)
+	if stat, err := os.Stat(mountTarget); err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			// cannot hotpatch
 			return nil
 		}
-		if err := os.Mkdir(dest, 0755); err != nil {
+		if err := os.Mkdir(mountTarget, 0755); err != nil {
 			return err
 		}
 	} else if !stat.IsDir() {
 		// cannot hotpatch
 		return nil
 	}
-	err = unix.Mount(hotdog.HotdogDirectory, dest, "bind", unix.MS_BIND|unix.MS_NODEV|unix.MS_NOATIME|unix.MS_RELATIME, "")
+	err = unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_BIND|unix.MS_NODEV|unix.MS_NOATIME|unix.MS_RELATIME, "")
 	if err != nil {
 		return err
 	}
 	// remount readonly
-	return unix.Mount(hotdog.HotdogDirectory, dest, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, "")
+	return unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, "")
+}
+
+func cp(in, out string) error {
+	inReader, err := os.OpenFile(in, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(outWriter, inReader)
+	return err
 }
