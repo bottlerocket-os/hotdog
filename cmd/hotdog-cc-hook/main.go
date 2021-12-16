@@ -55,8 +55,9 @@ func reexeced_main() error {
 	if err != nil {
 		return err
 	}
-	if spec.Root == nil || len(spec.Root.Path) == 0 {
-		return errors.New("undefined root path")
+	rootfs, err := hook.Root(bundle, spec)
+	if err != nil {
+		return err
 	}
 
 	hotdogBundleDir := filepath.Join(bundle, "hotdog")
@@ -76,7 +77,7 @@ func reexeced_main() error {
 		return err
 	}
 
-	mountTarget := filepath.Join(spec.Root.Path, hotdog.ContainerDir)
+	mountTarget := filepath.Join(rootfs, hotdog.ContainerDir)
 	if stat, err := os.Stat(mountTarget); err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			// cannot hotpatch
