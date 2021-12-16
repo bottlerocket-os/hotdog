@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/bottlerocket/hotdog"
@@ -54,7 +56,6 @@ func _main() error {
 		logger.Printf("Starting hotpatch after %v delay", d)
 		jvms := findJVMs()
 		for _, j := range jvms {
-			fmt.Println(j)
 			err := runHotpatch(j)
 			if err != nil {
 				logger.Printf("Patching %d failed: %v", j.pid, err)
@@ -67,6 +68,8 @@ func _main() error {
 type jvm struct {
 	pid     int
 	path    string
+	euid    uint32
+	egid    uint32
 	version string
 }
 
@@ -105,19 +108,64 @@ func findJVMs() []*jvm {
 			logger.Printf("Failed to execute %q for %d", "java -version", pid)
 			continue
 		}
+		euid, egid, err := findEUID(pid)
+		if err != nil {
+			logger.Printf("Failed to find EUID for %d: %v", pid, err)
+		}
 		jvms = append(jvms, &jvm{
 			pid:     pid,
 			path:    exePath,
+			euid:    euid,
+			egid:    egid,
 			version: string(versionOut),
 		})
 	}
 	return jvms
 }
 
+func findEUID(pid int) (uint32, uint32, error) {
+	status, err := os.OpenFile(filepath.Join("/proc", strconv.Itoa(pid), "status"), os.O_RDONLY, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+	scanner := bufio.NewScanner(status)
+	var (
+		uidLine string
+		gidLine string
+	)
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "Uid:") {
+			uidLine = scanner.Text()
+		}
+		if strings.HasPrefix(scanner.Text(), "Gid:") {
+			gidLine = scanner.Text()
+		}
+		if uidLine != "" && gidLine != "" {
+			break
+		}
+	}
+	if uidLine == "" || gidLine == "" {
+		return 0, 0, errors.New("not found")
+	}
+	uidLine = strings.TrimPrefix(uidLine, "Uid:\t")
+	uidStr := strings.SplitN(uidLine, "\t", 2)[0]
+	uid, err := strconv.Atoi(uidStr)
+	if err != nil {
+		return 0, 0, err
+	}
+	gidLine = strings.TrimPrefix(gidLine, "Gid:\t")
+	gidStr := strings.SplitN(gidLine, "\t", 2)[0]
+	gid, err := strconv.Atoi(gidStr)
+	if err != nil {
+		return 0, 0, err
+	}
+	return uint32(uid), uint32(gid), nil
+}
+
 func runHotpatch(j *jvm) error {
 	version, ok := findVersion(j)
 	if !ok {
-		logger.Printf("Unsupported Java version %q", version)
+		logger.Printf("Unsupported Java version %q for %d", version, j.pid)
 		return nil
 	}
 	var options []string
@@ -142,6 +190,12 @@ func runHotpatch(j *jvm) error {
 		return nil
 	}
 	patch := exec.Command(j.path, options...)
+	patch.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: j.euid,
+			Gid: j.egid,
+		},
+	}
 	out, err := patch.CombinedOutput()
 	exitCode := 0
 	if err != nil {
