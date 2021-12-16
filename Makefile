@@ -15,9 +15,9 @@ bin/hotdog-hotpatch: $(SOURCES) go.mod go.sum
 	CGO_ENABLED=0 go build -mod=readonly -installsuffix cgo -a -ldflags "-s" -o bin/hotdog-hotpatch ./cmd/hotdog-hotpatch
 
 install: hooks
-	install bin/hotdog-cc-hook /usr/local/bin
-	install bin/hotdog-poststart-hook /usr/local/bin
-	install -D bin/hotdog-hotpatch /usr/libexec/hotdog
+	install -D bin/hotdog-cc-hook /usr/libexec/hotdog/hotdog-cc-hook
+	install -D bin/hotdog-poststart-hook /usr/libexec/hotdog/hotdog-poststart-hook
+	install -D bin/hotdog-hotpatch /usr/share/hotdog/hotdog-hotpatch
 
 clean:
 	rm -rf bin

@@ -9,11 +9,11 @@ containers.
 To install Hotdog, you need to copy the following files to the right location
 and set the appropriate configuration.
 
-* Copy `jdk8-Log4jHotPatch.jar` to `/usr/libexec/hotdog`
-* Copy `jdk11-Log4jHotPatch.jar` to `/usr/libexec/hotdog`
-* Copy `jdk17-Log4jHotPatchFat.jar` to `/usr/libexec/hotdog`
+* Copy `jdk8-Log4jHotPatch.jar` to `/usr/share/hotdog`
+* Copy `jdk11-Log4jHotPatch.jar` to `/usr/share/hotdog`
+* Copy `jdk17-Log4jHotPatchFat.jar` to `/usr/share/hotdog`
 * Run `make install` to install `hotdog-cc-hook`, `hotdog-poststart-hook`, to
-  `/usr/local/bin` and to install `hotdog-hotpatch` to `/usr/libexec/hotdog`
+  `/usr/libexec/hotdog` and to install `hotdog-hotpatch` to `/usr/share/hotdog`
 * Install `oci-add-hooks`
 * Configure `oci-add-hooks` as by writing the following contents to
   `/etc/hotdog/config.json`:
@@ -21,10 +21,10 @@ and set the appropriate configuration.
   {
     "hooks": {
       "prestart": [{
-        "path": "/usr/local/bin/hotdog-cc-hook"
+        "path": "/usr/libexec/hotdog/hotdog-cc-hook"
       }],
       "poststart": [{
-        "path": "/usr/local/bin/hotdog-poststart-hook"
+        "path": "/usr/libexec/hotdog/hotdog-poststart-hook"
       }]
     }
   }

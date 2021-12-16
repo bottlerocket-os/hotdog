@@ -1,7 +1,7 @@
 package hotdog
 
 var (
-	HostDir        = "/usr/libexec/hotdog"
+	HostDir        = "/usr/share/hotdog"
 	ContainerDir   = "/dev/shm/.hotdog"
 	JDK8Patch      = "jdk8-Log4jHotPatch.jar"
 	JDK8Class      = "Log4jHotPatch"
