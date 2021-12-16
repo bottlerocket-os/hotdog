@@ -73,3 +73,11 @@ and hotpach JVMs inside the container.
 `hotdog` will add several files to the `/dev/shm/.hotdog` directory in each
 container.  You can find the log from `hotdog-hotpatch` in
 `/dev/shm/hotdog.log`.
+
+## Security
+
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+
+## License
+
+This project is licensed under the Apache-2.0 License.
