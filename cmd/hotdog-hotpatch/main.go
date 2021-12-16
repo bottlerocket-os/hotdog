@@ -168,14 +168,11 @@ func runHotpatch(j *jvm) error {
 		logger.Printf("Unsupported Java version %q for %d", version, j.pid)
 		return nil
 	}
+	patchPath := filepath.Join(hotdog.ContainerDir, hotdog.PatchPath)
 	var options []string
 	switch version {
-	case java17:
-		patchPath := filepath.Join(hotdog.ContainerDir, hotdog.JDK17Patch)
-		options = append(jvmOpts, "-cp", patchPath, "-DfatJar="+patchPath, hotdog.JDK17Class, strconv.Itoa(j.pid))
-	case java11:
-		patchPath := filepath.Join(hotdog.ContainerDir, hotdog.JDK11Patch)
-		options = append(jvmOpts, "-cp", patchPath, hotdog.JDK11Class, strconv.Itoa(j.pid))
+	case java17, java11:
+		options = append(jvmOpts, "-jar", patchPath, strconv.Itoa(j.pid))
 	case java8:
 		// Sometimes java is invoked as $JAVAHOME/jre/bin/java versus $JAVAHOME/bin/java, try to correct for this.
 		bindir := filepath.Dir(j.path)
@@ -184,7 +181,6 @@ func runHotpatch(j *jvm) error {
 		if dirname == "jre" {
 			basedir = filepath.Dir(basedir)
 		}
-		patchPath := filepath.Join(hotdog.ContainerDir, hotdog.JDK8Patch)
 		options = append(jvmOpts, "-cp", filepath.Join(basedir, "lib", "tools.jar")+":"+patchPath, hotdog.JDK8Class, strconv.Itoa(j.pid))
 	default:
 		return nil
@@ -216,6 +212,7 @@ func findVersion(j *jvm) (jvmVersion, bool) {
 	}
 	if len(split) < 3 {
 		logger.Printf("Failed to locate version for %d", j.pid)
+		return "", false
 	}
 	semver := split[2]
 	if semver[0] == '"' {
