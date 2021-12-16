@@ -78,7 +78,8 @@ func reexeced_main() error {
 			return nil
 		}
 		if err := os.Mkdir(mountTarget, 0755); err != nil {
-			return err
+			// cannot hotpatch
+			return nil
 		}
 	} else if !stat.IsDir() {
 		// cannot hotpatch
