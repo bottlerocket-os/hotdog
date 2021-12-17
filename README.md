@@ -11,11 +11,12 @@ and set the appropriate configuration.
 
 * Copy `Log4jHotPatch.jar` to `/usr/share/hotdog` (if you build the hotpatch
   from source, you'll find it in `build/libs`)
-* Run `make install` to install `hotdog-cc-hook`, `hotdog-poststart-hook`, to
-  `/usr/libexec/hotdog` and to install `hotdog-hotpatch` to `/usr/share/hotdog`
-* Install `oci-add-hooks`
-* Configure `oci-add-hooks` as by writing the following contents to
-  `/etc/hotdog/config.json`:
+* Run `make && make install` to install `hotdog-cc-hook`,
+  `hotdog-poststart-hook`, to `/usr/libexec/hotdog` and to install
+  `hotdog-hotpatch` to `/usr/share/hotdog`
+* Install [`oci-add-hooks`](https://github.com/awslabs/oci-add-hooks/)
+* Configure `oci-add-hooks` with the hotdog hooks by writing the following
+  contents to `/etc/hotdog/config.json`:
   ```json
   {
     "hooks": {
@@ -28,7 +29,7 @@ and set the appropriate configuration.
     }
   }
   ```
-* Configure Docker to use the hook by writing the following contents into
+* Configure Docker to use the hooks by writing the following contents into
   `/etc/docker/daemon.json`:
   ```json
   {
@@ -44,7 +45,7 @@ and set the appropriate configuration.
   }
   ```
 
-To run a container with the hotpatching enabled, specify
+To run a container with hotpatching enabled, specify
 `docker run --runtime hotdog`.  To run with hotpatching enabled by default in
 all containers, add the following contents to `/etc/docker/daemon.json`:
 ```
