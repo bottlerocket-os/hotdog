@@ -20,6 +20,8 @@ and hotpach JVMs inside the container.
 * Hotdog only runs for a short time at the beginning of a container's lifetime.
   If new Java processes are started after the `hotdog-hotpatch` process exits,
   they will not be hot patched.
+* Hotdog only patches processes named "java".  If your Java application has a
+  different process name, hotdog will not patch it.
 * Hotdog works best when the container has its own pid namespace.  If hotdog is
   used with a container that has a shared pid namespace, the `hotdog-hotpatch`
   might remain for a short time after the container exits.
