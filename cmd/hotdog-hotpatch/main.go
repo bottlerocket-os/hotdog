@@ -16,7 +16,7 @@ import (
 	"github.com/bottlerocket/hotdog"
 )
 
-var jvmOpts = []string{"-Xint", "-XX:+UseSerialGC"}
+var jvmOpts = []string{"-Xint", "-XX:+UseSerialGC", "-Dlog4jFixerVerbose=false"}
 var delays = []time.Duration{
 	0,
 	time.Second,
