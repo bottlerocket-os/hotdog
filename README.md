@@ -63,6 +63,20 @@ namespaces and fork off a `hotdog-hotpatch` process.  `hotdog-hotpatch` runs
 several times with decreasing frequency (currently 1s, 5s, 10s, 30s) to detect
 and hotpach JVMs inside the container.
 
+## Limitations
+
+* Hotdog only provides hotpatching support for Java 8, 11, 15, and 17.
+* Hotdog only runs for a short time at the beginning of a container's lifetime.
+  If new Java processes are started after the `hotdog-hotpatch` process exits,
+  they will not be hot patched.
+* Hotdog works best when the container has its own pid namespace.  If hotdog is
+  used with a container that has a shared pid namespace, the `hotdog-hotpatch`
+  might remain for a short time after the container exits.
+* Hotdog injects its components into `/dev/shm/.hotdog` inside the container.
+  If `/dev/shm` does not exist (such as in the case of Docker containers
+  launched with `--ipc=none`), hotdog will not be injected into the container
+  and will not provide hotpatching.
+
 ## Troubleshooting
 
 `hotdog` will add several files to the `/dev/shm/.hotdog` directory in each
