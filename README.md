@@ -32,6 +32,30 @@ and hotpach JVMs inside the container.
 
 ## Installation
 
+### Bottlerocket
+
+Hotdog is included by default in Bottlerocket 1.5.0.
+
+Hotpatching can be enabled for new launches of Bottlerocket by including the
+following settings in user data.
+
+```toml
+[settings.oci-hooks]
+log4j-hotpatch-enabled = true
+```
+
+For existing hosts running the latest version of Bottlerocket, hotpatching can
+be enabled using the API client.
+
+```shell
+apiclient set oci-hooks.log4j-hotpatch-enabled=true
+```
+
+Enabling the setting at runtime has no effect on running containers.
+Newly-launched containers will be hotpatched.
+
+### Other Linux distributions
+
 To install Hotdog, you need to copy the following files to the right location
 and set the appropriate configuration.
 
