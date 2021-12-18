@@ -87,7 +87,8 @@ func reexeced_main() error {
 	}
 	err = unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_BIND|unix.MS_NODEV|unix.MS_NOATIME|unix.MS_RELATIME, "")
 	if err != nil {
-		return err
+		// cannot hotpatch
+		return nil
 	}
 	// remount readonly
 	return unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, "")
