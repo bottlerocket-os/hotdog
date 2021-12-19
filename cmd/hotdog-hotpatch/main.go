@@ -48,6 +48,7 @@ func _main() error {
 	if err != nil {
 		return err
 	}
+	defer logFile.Close()
 	logger = log.New(logFile, "", log.LstdFlags|log.LUTC)
 	logger.Println("Starting hotpatch")
 
@@ -128,6 +129,7 @@ func findEUID(pid int) (uint32, uint32, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	defer status.Close()
 	scanner := bufio.NewScanner(status)
 	var (
 		uidLine string

@@ -99,10 +99,12 @@ func cp(in, out string) error {
 	if err != nil {
 		return err
 	}
+	defer inReader.Close()
 	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
 	if err != nil {
 		return err
 	}
+	defer outWriter.Close()
 	_, err = io.Copy(outWriter, inReader)
 	return err
 }
