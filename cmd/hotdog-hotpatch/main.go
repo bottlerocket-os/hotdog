@@ -103,15 +103,21 @@ func findJVMs() []*jvm {
 			logger.Printf("Failed to readlink for %d", pid)
 			continue
 		}
+		euid, egid, err := findEUID(pid)
+		if err != nil {
+			logger.Printf("Failed to find EUID for %d: %v", pid, err)
+		}
 		javaVersionCmd := exec.Command(exePath, "-version")
+		javaVersionCmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: euid,
+				Gid: egid,
+			},
+		}
 		versionOut, err := javaVersionCmd.CombinedOutput()
 		if err != nil {
 			logger.Printf("Failed to execute %q for %d", "java -version", pid)
 			continue
-		}
-		euid, egid, err := findEUID(pid)
-		if err != nil {
-			logger.Printf("Failed to find EUID for %d: %v", pid, err)
 		}
 		jvms = append(jvms, &jvm{
 			pid:     pid,
