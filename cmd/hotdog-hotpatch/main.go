@@ -2,7 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,16 +18,33 @@ import (
 	"time"
 
 	"github.com/bottlerocket/hotdog"
+
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"kernel.org/pub/linux/libs/security/libcap/cap"
 )
 
-var jvmOpts = []string{"-Xint", "-XX:+UseSerialGC", "-Dlog4jFixerVerbose=false"}
-var delays = []time.Duration{
-	0,
-	time.Second,
-	5 * time.Second,
-	10 * time.Second,
-	30 * time.Second,
-}
+var (
+	// hotdogCaps are the minimum set of capabilities we must reserve for
+	// hotdog-hotpatch to execute.  These capabilities should be dropped when
+	// executing untrusted container executables.
+	hotdogCaps = []cap.Value{
+		cap.SYS_PTRACE,      // readlink /proc/<pid>/exe, bypassing UID check
+		cap.DAC_OVERRIDE,    // ensure we can read files as root
+		cap.DAC_READ_SEARCH, // ensure we can traverse into directories as root
+		cap.SETGID,          // allow us to change GID
+		cap.SETUID,          // allow us to change UID
+		cap.SETPCAP,         // allow us to set process capabilities
+	}
+	logger *log.Logger
+	delays = []time.Duration{
+		0,
+		time.Second,
+		5 * time.Second,
+		10 * time.Second,
+		30 * time.Second,
+	}
+	jvmOpts = []string{"-Xint", "-XX:+UseSerialGC", "-Dlog4jFixerVerbose=false"}
+)
 
 const processName = "java"
 
@@ -34,8 +55,6 @@ const (
 	java11 jvmVersion = "11"
 	java8  jvmVersion = "8"
 )
-
-var logger *log.Logger
 
 func main() {
 	if err := _main(); err != nil {
@@ -52,6 +71,11 @@ func _main() error {
 	logger = log.New(logFile, "", log.LstdFlags|log.LUTC)
 	logger.Println("Starting hotpatch")
 
+	if err := constrainHotdogCapabilities(); err != nil {
+		logger.Printf("Failed to constrain hotdog's capabilities: %v", err)
+		return err
+	}
+
 	for _, d := range delays {
 		time.Sleep(d)
 		logger.Printf("Starting hotpatch after %v delay", d)
@@ -66,11 +90,66 @@ func _main() error {
 	return nil
 }
 
+// constrainHotdogCapabilities reduces the permission set available to the
+// hotdog-hotpatch process itself.  Before launching other processes, this
+// permission set should be further reduced.  In order to successfully apply
+// the hotpatch, this must be a superset of the capabilities granted to the
+// hotpatch process.  We can assume that no process inside the target container
+// has capabilities exceeding the bounding set defined in the bundle.
+func constrainHotdogCapabilities() error {
+	capJSON := os.Getenv(hotdog.EnvCapability)
+	if len(capJSON) == 0 {
+		logger.Println("cannot find container capabilities!")
+		return errors.New(hotdog.EnvCapability + " empty")
+	}
+	var containerCapabilities specs.LinuxCapabilities
+	err := json.Unmarshal([]byte(capJSON), &containerCapabilities)
+	if err != nil {
+		return fmt.Errorf("cannot unmarshal container capabilities: %w", err)
+	}
+
+	containerBSet := make([]cap.Value, 0)
+	for _, name := range containerCapabilities.Bounding {
+		v, err := cap.FromName(strings.ToLower(name))
+		if err != nil {
+			return fmt.Errorf("cannot parse %q: %w", name, err)
+		}
+		containerBSet = append(containerBSet, v)
+	}
+
+	set := cap.NewSet()
+	if err := set.SetFlag(cap.Permitted, true, append(containerBSet, hotdogCaps...)...); err != nil {
+		return fmt.Errorf("failed to set permitted caps: %w", err)
+	}
+	if err := set.Fill(cap.Effective, cap.Permitted); err != nil {
+		return fmt.Errorf("failed to set effective caps: %w", err)
+	}
+	if err := set.ClearFlag(cap.Inheritable); err != nil {
+		return fmt.Errorf("failed to set inheritable caps: %w", err)
+	}
+
+	logger.Printf("Reducing capabilities to: %q", set.String())
+	if err := set.SetProc(); err != nil {
+		return fmt.Errorf("failed to setpcap: %w", err)
+	}
+	if err := cap.ResetAmbient(); err != nil {
+		return fmt.Errorf("failed to clear ambient caps: %w", err)
+	}
+	for i := 0; i < int(cap.MaxBits()); i++ {
+		if ok, err := set.GetFlag(cap.Permitted, cap.Value(i)); err != nil || !ok {
+			if err := cap.DropBound(cap.Value(i)); err != nil {
+				return fmt.Errorf("failed to drop %s: %w", cap.Value(i).String(), err)
+			}
+		}
+	}
+	return nil
+}
+
 type jvm struct {
 	pid     int
 	path    string
-	euid    uint32
-	egid    uint32
+	euid    int
+	egid    int
 	version string
 }
 
@@ -107,16 +186,9 @@ func findJVMs() []*jvm {
 		if err != nil {
 			logger.Printf("Failed to find EUID for %d: %v", pid, err)
 		}
-		javaVersionCmd := exec.Command(exePath, "-version")
-		javaVersionCmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: euid,
-				Gid: egid,
-			},
-		}
-		versionOut, err := javaVersionCmd.CombinedOutput()
+		versionOut, err := commandDroppedPrivs(exePath, []string{"-version"}, euid, egid, pid)
 		if err != nil {
-			logger.Printf("Failed to execute %q for %d", "java -version", pid)
+			logger.Printf("Failed to execute %q for %d: %v", "java -version", pid, err)
 			continue
 		}
 		jvms = append(jvms, &jvm{
@@ -130,7 +202,84 @@ func findJVMs() []*jvm {
 	return jvms
 }
 
-func findEUID(pid int) (uint32, uint32, error) {
+// commandDroppedPrivs runs the specified program with the specified UID and
+// GID but a reduced capability set.  For programs running with a non-zero UID,
+// we drop all capabilities in every set including the bounding set.  For
+// programs run as UID 0, match the capability sets of the target process.
+// This allows the kernel's PTRACE_MODE_READ_FSCREDS check to pass when the
+// hotpatch attempts to find the JVM's socket by reading /proc/<pid>/root/.
+func commandDroppedPrivs(name string, arg []string, uid, gid, targetPID int) ([]byte, error) {
+	cmd := cap.NewLauncher(name, append([]string{name}, arg...), nil)
+	if uid != 0 {
+		cmd.SetUID(uid)
+		cmd.SetMode(cap.ModeNoPriv)
+		logger.Printf("dropping all capabilities and switching UID to %d for %s", uid, name)
+	}
+	if gid != 0 {
+		cmd.SetGroups(gid, nil)
+	}
+	pr, pw, err := os.Pipe()
+	defer pw.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate pipe for %q: %w", name, err)
+	}
+	buf := &bytes.Buffer{}
+	go func() {
+		io.Copy(buf, pr)
+		pr.Close()
+	}()
+	cmd.Callback(func(attr *syscall.ProcAttr, i interface{}) error {
+		// Capture stdout/stderr, since we can't rely on the exec package to
+		//do it for us here.
+		attr.Files[1] = pw.Fd()
+		attr.Files[2] = pw.Fd()
+
+		// cap.* functions called within the callback only affect the locked OS
+		// thread used to launch the program
+		if targetPID != 0 && uid == 0 {
+			set, err := cap.GetPID(targetPID)
+			if err != nil {
+				return fmt.Errorf("failed to load caps for %d: %w", targetPID, err)
+			}
+			if err := set.ClearFlag(cap.Inheritable); err != nil {
+				return fmt.Errorf("failed to clear inheritable set: %w", err)
+			}
+			iabSet, err := cap.IABGetPID(targetPID)
+			if err != nil {
+				return fmt.Errorf("failed to load IAB for %d: %w", targetPID, err)
+			}
+			if err := iabSet.SetProc(); err != nil {
+				return fmt.Errorf("failed to set IAB: %w", err)
+			}
+			if err := cap.ResetAmbient(); err != nil {
+				return fmt.Errorf("failed to reset ambient: %w", err)
+			}
+			if err := set.SetProc(); err != nil {
+				return fmt.Errorf("failed to set caps: %w", err)
+			}
+			logger.Printf("setting caps to %q for %q", set.String(), name)
+			logger.Printf("setting IAB to %q for %q", iabSet.String(), name)
+		}
+		return nil
+	})
+	pid, err := cmd.Launch(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to launch %q: %w", name, err)
+	}
+	proc := os.Process{Pid: pid}
+	state, err := proc.Wait()
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait on %q: %w", name, err)
+	}
+	if state.ExitCode() != 0 {
+		err = &exec.ExitError{ProcessState: state}
+	}
+
+	versionOut := buf.Bytes()
+	return versionOut, err
+}
+
+func findEUID(pid int) (int, int, error) {
 	status, err := os.OpenFile(filepath.Join("/proc", strconv.Itoa(pid), "status"), os.O_RDONLY, 0)
 	if err != nil {
 		return 0, 0, err
@@ -167,7 +316,7 @@ func findEUID(pid int) (uint32, uint32, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return uint32(uid), uint32(gid), nil
+	return uid, gid, nil
 }
 
 func runHotpatch(j *jvm) error {
@@ -193,14 +342,7 @@ func runHotpatch(j *jvm) error {
 	default:
 		return nil
 	}
-	patch := exec.Command(j.path, options...)
-	patch.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: j.euid,
-			Gid: j.egid,
-		},
-	}
-	out, err := patch.CombinedOutput()
+	out, err := commandDroppedPrivs(j.path, options, j.euid, j.egid, j.pid)
 	exitCode := 0
 	if err != nil {
 		if execErr, ok := err.(*exec.ExitError); ok {

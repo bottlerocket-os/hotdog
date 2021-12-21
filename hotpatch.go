@@ -6,4 +6,5 @@ var (
 	JDK8Class      = "Log4jHotPatch"
 	PatchPath      = "Log4jHotPatch.jar"
 	HotpatchBinary = "hotdog-hotpatch"
+	EnvCapability  = "HOTDOG_CAPABILITIES"
 )

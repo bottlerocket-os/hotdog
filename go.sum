@@ -5,3 +5,7 @@ github.com/opencontainers/selinux v1.10.0/go.mod h1:2i0OySw99QjzBBQByd1Gr9gSjvuh
 golang.org/x/sys v0.0.0-20191115151921-52ab43148777/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20211215211219-4abf325e0275 h1:QrMf/wK/gIZUuD4s06oYPfuSxBzj4mL/rjA7D++U14o=
 golang.org/x/sys v0.0.0-20211215211219-4abf325e0275/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+kernel.org/pub/linux/libs/security/libcap/cap v1.2.62 h1:9iE7a676uhvcBUqPaX1m8vsGPLxWhY6HacTae4fAZ4M=
+kernel.org/pub/linux/libs/security/libcap/cap v1.2.62/go.mod h1:IZIlNB3lc6EmaOILJvTigHdE+vE5DrVDEEm6CB133Ak=
+kernel.org/pub/linux/libs/security/libcap/psx v1.2.62 h1:Tko+77IH7RReA/jcHqaVgtUJ9zAaXH4I0ZE3YHluBdw=
+kernel.org/pub/linux/libs/security/libcap/psx v1.2.62/go.mod h1:+l6Ee2F59XiJ2I6WR5ObpC1utCQJZ/VLsEbQCD8RG24=

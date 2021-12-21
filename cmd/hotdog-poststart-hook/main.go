@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -34,9 +35,14 @@ func _main() error {
 			return err
 		}
 	}
+	capJSON, err := json.Marshal(spec.Process.Capabilities)
+	if err != nil {
+		return err
+	}
 	hotpatch := exec.Command("nsenter",
 		"-t", strconv.Itoa(state.Pid),
 		"-m", "-n", "-i", "-u", "-p",
 		filepath.Join(hotdog.ContainerDir, hotdog.HotpatchBinary))
+	hotpatch.Env = []string{hotdog.EnvCapability + "=" + string(capJSON)}
 	return hotpatch.Start()
 }
