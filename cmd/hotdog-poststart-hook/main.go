@@ -3,10 +3,13 @@ package main
 import (
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/bottlerocket/hotdog"
 	"github.com/bottlerocket/hotdog/hook"
+
+	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
 func main() {
@@ -20,7 +23,17 @@ func _main() error {
 	if err != nil {
 		return err
 	}
-
+	spec, err := hook.Config(state)
+	if err != nil {
+		return err
+	}
+	if spec.Process.SelinuxLabel != "" {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		if err := selinux.SetExecLabel(spec.Process.SelinuxLabel); err != nil {
+			return err
+		}
+	}
 	hotpatch := exec.Command("nsenter",
 		"-t", strconv.Itoa(state.Pid),
 		"-m", "-n", "-i", "-u", "-p",
