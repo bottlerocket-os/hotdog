@@ -13,6 +13,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
+	"golang.org/x/sys/unix"
 )
 
 func main() {
@@ -57,8 +58,10 @@ func _main() error {
 	return nil
 }
 
-// constrainProcess sets the SELinux label of the running process, and changes
-// its cgroups to be the same as the target container.
+// constrainProcess sets the SELinux label of the running process, changes
+// its cgroups to be the same as the target container, and sets the
+// `NO_NEW_PRIVS` flags to prevent the current process to get more
+// privileges.
 func constrainProcess(spec specs.Spec, targetPID string) error {
 	if err := cgroups.EnterCgroups(targetPID); err != nil {
 		return err
@@ -67,6 +70,9 @@ func constrainProcess(spec specs.Spec, targetPID string) error {
 		if err := selinux.SetExecLabel(spec.Process.SelinuxLabel); err != nil {
 			return err
 		}
+	}
+	if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+		return err
 	}
 	return nil
 }
