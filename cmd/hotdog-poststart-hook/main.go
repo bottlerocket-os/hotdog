@@ -10,6 +10,7 @@ import (
 	"github.com/bottlerocket/hotdog"
 	"github.com/bottlerocket/hotdog/cgroups"
 	"github.com/bottlerocket/hotdog/hook"
+	"github.com/bottlerocket/hotdog/seccomp"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -33,15 +34,26 @@ func _main() error {
 		return err
 	}
 	targetPID := strconv.Itoa(state.Pid)
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
 	// Silently exit if:
+	// - An error occurred while fetching the container's seccomp profile
 	// - The process fails to constrain itself
 	// - An error occurred while reading the container's capabilities
 	// - An error occurred while the hotpatch was applied
 	// We don't send these errors to the STDOUT because the runtime
 	// only reads it when the hook errors out
+
+	// Get the seccomp filters from the target container
+	filters, err := seccomp.GetSeccompFilter(state.Pid)
+	if err != nil {
+		return nil
+	}
+	filtersJSON, err := json.Marshal(filters)
+	if err != nil {
+		return nil
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	if err := constrainProcess(spec, targetPID); err != nil {
 		return nil
 	}
@@ -53,7 +65,10 @@ func _main() error {
 		"-t", targetPID,
 		"-m", "-n", "-i", "-u", "-p",
 		filepath.Join(hotdog.ContainerDir, hotdog.HotpatchBinary))
-	hotpatch.Env = []string{hotdog.EnvCapability + "=" + string(capJSON)}
+	hotpatch.Env = []string{
+		hotdog.EnvCapability + "=" + string(capJSON),
+		hotdog.EnvSeccompFilter + "=" + string(filtersJSON),
+	}
 	hotpatch.Start()
 	return nil
 }
