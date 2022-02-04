@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/bottlerocket/hotdog"
+	"github.com/bottlerocket/hotdog/process"
 	"github.com/bottlerocket/hotdog/seccomp"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -219,11 +219,12 @@ func findJVMs() []*jvm {
 			logger.Printf("Failed to readlink for %d", pid)
 			continue
 		}
-		euid, egid, err := findEUID(pid)
+		status, err := process.ParseProcessStatus(pid)
 		if err != nil {
 			logger.Printf("Failed to find EUID for %d: %v", pid, err)
+			continue
 		}
-		versionOut, err := commandDroppedPrivs(exePath, []string{"-version"}, euid, egid, pid)
+		versionOut, err := commandDroppedPrivs(exePath, []string{"-version"}, status.Uid, status.Gid, pid)
 		if err != nil {
 			logger.Printf("Failed to execute %q for %d: %v, %q", "java -version", pid, err, string(versionOut))
 			continue
@@ -231,8 +232,8 @@ func findJVMs() []*jvm {
 		jvms = append(jvms, &jvm{
 			pid:     pid,
 			path:    exePath,
-			euid:    euid,
-			egid:    egid,
+			euid:    status.Uid,
+			egid:    status.Gid,
 			version: string(versionOut),
 		})
 	}
@@ -318,46 +319,6 @@ func commandDroppedPrivs(name string, arg []string, uid, gid, targetPID int) ([]
 
 	versionOut := buf.Bytes()
 	return versionOut, err
-}
-
-func findEUID(pid int) (int, int, error) {
-	status, err := os.OpenFile(filepath.Join("/proc", strconv.Itoa(pid), "status"), os.O_RDONLY, 0)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer status.Close()
-	scanner := bufio.NewScanner(status)
-	var (
-		uidLine string
-		gidLine string
-	)
-	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "Uid:") {
-			uidLine = scanner.Text()
-		}
-		if strings.HasPrefix(scanner.Text(), "Gid:") {
-			gidLine = scanner.Text()
-		}
-		if uidLine != "" && gidLine != "" {
-			break
-		}
-	}
-	if uidLine == "" || gidLine == "" {
-		return 0, 0, errors.New("not found")
-	}
-	uidLine = strings.TrimPrefix(uidLine, "Uid:\t")
-	uidStr := strings.SplitN(uidLine, "\t", 2)[0]
-	uid, err := strconv.Atoi(uidStr)
-	if err != nil {
-		return 0, 0, err
-	}
-	gidLine = strings.TrimPrefix(gidLine, "Gid:\t")
-	gidStr := strings.SplitN(gidLine, "\t", 2)[0]
-	gid, err := strconv.Atoi(gidStr)
-	if err != nil {
-		return 0, 0, err
-	}
-	return uid, gid, nil
 }
 
 func runHotpatch(j *jvm) error {
