@@ -64,10 +64,13 @@ func reexeced_main() error {
 	if err := os.Mkdir(hotdogBundleDir, 0755); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.PatchPath), filepath.Join(hotdogBundleDir, hotdog.PatchPath)); err != nil {
+	// Copy the artifacts used in the poststart hook with the specified
+	// permissions, so that child processes won't have the dumpable flag
+	// set
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.PatchPath), filepath.Join(hotdogBundleDir, hotdog.PatchPath), 0444); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, hotdog.HotpatchBinary)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, hotdog.HotpatchBinary), 0111); err != nil {
 		return err
 	}
 
@@ -94,13 +97,13 @@ func reexeced_main() error {
 	return unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, "")
 }
 
-func cp(in, out string) error {
+func cp(in, out string, mode os.FileMode) error {
 	inReader, err := os.OpenFile(in, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
 	defer inReader.Close()
-	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
