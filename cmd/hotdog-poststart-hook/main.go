@@ -10,6 +10,7 @@ import (
 	"github.com/bottlerocket/hotdog"
 	"github.com/bottlerocket/hotdog/cgroups"
 	"github.com/bottlerocket/hotdog/hook"
+	"github.com/bottlerocket/hotdog/process"
 	"github.com/bottlerocket/hotdog/seccomp"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -79,6 +80,9 @@ func _main() error {
 // privileges.
 func constrainProcess(spec specs.Spec, targetPID string) error {
 	if err := cgroups.EnterCgroups(targetPID); err != nil {
+		return err
+	}
+	if err := process.ConstrainFileDescriptors(); err != nil {
 		return err
 	}
 	if spec.Process.SelinuxLabel != "" {

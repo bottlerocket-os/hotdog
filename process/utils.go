@@ -2,10 +2,14 @@ package process
 
 import (
 	"bufio"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -77,4 +81,27 @@ func parseIdLine(line string) (int, error) {
 	line = strings.TrimSpace(line)
 	str := strings.SplitN(line, "\t", 2)[0]
 	return strconv.Atoi(str)
+}
+
+// ConstrainFileDescriptors sets the FD_CLOEXEC flag in all
+// the open file descriptors of the current process
+func ConstrainFileDescriptors() error {
+	pid := strconv.Itoa(os.Getpid())
+	files, err := ioutil.ReadDir("/proc/self/fd")
+	if err != nil {
+		return fmt.Errorf("failed to read /proc for %s", pid)
+	}
+	for _, file := range files {
+		fd, err := strconv.Atoi(file.Name())
+		if err != nil {
+			return fmt.Errorf("failed to transform file name: %v", file.Name())
+		}
+		_, err = unix.FcntlInt(uintptr(fd), unix.F_SETFD, unix.FD_CLOEXEC)
+		// `fcntl` returns `EBADF` when the file descriptor is no longer open,
+		// so we can silently ignore such errors
+		if err != nil && err != unix.EBADF {
+			return fmt.Errorf("failed to set FD_CLOEXEC in '%d': %v", fd, err)
+		}
+	}
+	return nil
 }

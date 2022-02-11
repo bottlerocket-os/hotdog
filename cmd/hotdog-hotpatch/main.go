@@ -110,6 +110,10 @@ func set_filters_main(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get filters from stdin: %v", err)
 	}
+	// Constrain this process' file descriptors
+	if err := process.ConstrainFileDescriptors(); err != nil {
+		return fmt.Errorf("failed to contrain the process file descriptors: %v", err)
+	}
 	// Set the seccomp filters before launching the final command
 	if err := seccomp.SetSeccompFilters(filters); err != nil {
 		return fmt.Errorf("failed to set filters: %v", err)
@@ -178,6 +182,11 @@ func constrainHotdogCapabilities() error {
 				return fmt.Errorf("failed to drop %s: %w", cap.Value(i).String(), err)
 			}
 		}
+	}
+
+	logger.Printf("Constraining file descriptors")
+	if err := process.ConstrainFileDescriptors(); err != nil {
+		return fmt.Errorf("failed to contrain the process file descriptors: %v", err)
 	}
 	return nil
 }
