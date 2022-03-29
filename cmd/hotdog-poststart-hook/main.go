@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -35,6 +36,14 @@ func _main() error {
 		return err
 	}
 	targetPID := strconv.Itoa(state.Pid)
+
+	// Don't proceed if the prestart hook failed to copy the required
+	// artifacts so that we don't execute arbitrary binaries that could
+	// be inside the container's filesystem
+	if !sentryExists(state.Bundle) {
+		return nil
+	}
+
 	// Silently exit if:
 	// - An error occurred while fetching the container's seccomp profile
 	// - The process fails to constrain itself
@@ -94,4 +103,12 @@ func constrainProcess(spec specs.Spec, targetPID string) error {
 		return err
 	}
 	return nil
+}
+
+// sentryExists returns true if the sentry file created in the prestart
+// hook in the container's bundle exists, and it is a regular file
+func sentryExists(bundle string) bool {
+	stat, err := os.Stat(filepath.Join(bundle, hotdog.HotdogBundleDir, hotdog.PostStartHookSentry))
+	// Treat any error as if the sentry file doesn't exist
+	return err == nil && stat.Mode().IsRegular()
 }

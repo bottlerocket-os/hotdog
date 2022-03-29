@@ -8,13 +8,15 @@ import (
 )
 
 var (
-	HostDir          = "/usr/share/hotdog"
-	ContainerDir     = "/dev/shm/.hotdog"
-	JDK8Class        = "Log4jHotPatch"
-	PatchPath        = "Log4jHotPatch.jar"
-	HotpatchBinary   = "hotdog-hotpatch"
-	EnvCapability    = "HOTDOG_CAPABILITIES"
-	EnvSeccompFilter = "HOTDOG_SECCOMP_FILTER"
+	HostDir             = "/usr/share/hotdog"
+	ContainerDir        = "/dev/shm/.hotdog"
+	JDK8Class           = "Log4jHotPatch"
+	PatchPath           = "Log4jHotPatch.jar"
+	HotpatchBinary      = "hotdog-hotpatch"
+	EnvCapability       = "HOTDOG_CAPABILITIES"
+	EnvSeccompFilter    = "HOTDOG_SECCOMP_FILTER"
+	PostStartHookSentry = "hotdog-inject-success"
+	HotdogBundleDir     = "hotdog"
 )
 
 // GetFiltersFromEnv reads and parses the seccomp filters passed as an
