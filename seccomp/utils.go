@@ -47,11 +47,15 @@ func GetSeccompFilter(targetPID int) (allFilters [][]syscall.SockFilter, err err
 		}
 	}()
 
-	allFilters = make([][]syscall.SockFilter, status.Filters)
-	for i := 0; i < status.Filters; i++ {
+	for i := 0; ; i++ {
 		// Get the filter size
 		sz, err := ptraceSeccompGetFilter(targetPID, i, nil)
 		if err != nil {
+			// An ENOENT error means we are at the end of the filters list
+			if err == unix.ENOENT {
+				break
+			}
+			// Fail in any other error
 			return nil, fmt.Errorf("got error while sizing the filter: %v", err)
 		}
 		// Get the filter data
@@ -60,7 +64,7 @@ func GetSeccompFilter(targetPID int) (allFilters [][]syscall.SockFilter, err err
 		if err != nil {
 			return nil, fmt.Errorf("got error while getting the filter data: %v", err)
 		}
-		allFilters[i] = seccompFilter
+		allFilters = append(allFilters, seccompFilter)
 	}
 
 	return allFilters, err

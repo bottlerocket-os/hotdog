@@ -13,18 +13,16 @@ import (
 )
 
 const (
-	seccompStatus  = "Seccomp:"
-	seccompFilters = "Seccomp_filters:"
-	uid            = "Uid:"
-	gid            = "Gid:"
+	seccompStatus = "Seccomp:"
+	uid           = "Uid:"
+	gid           = "Gid:"
 )
 
 // ProcessStatus represents a process status
 type ProcessStatus struct {
-	State   int
-	Filters int
-	Uid     int
-	Gid     int
+	State int
+	Uid   int
+	Gid   int
 }
 
 // ParseProcessStatus reads the '/proc/<pid>/status' file to retrieve
@@ -36,30 +34,24 @@ func ParseProcessStatus(targetPID int) (*ProcessStatus, error) {
 	}
 	defer f.Close()
 	s := bufio.NewScanner(f)
-	var filtersLine, stateLine, uidLine, gidLine string
+	var stateLine, uidLine, gidLine string
 
 	for s.Scan() {
 		text := s.Text()
 		switch {
 		case strings.Contains(text, seccompStatus):
 			stateLine = strings.TrimSpace(text[len(seccompStatus):])
-		case strings.Contains(text, seccompFilters):
-			filtersLine = strings.TrimSpace(text[len(seccompFilters):])
 		case strings.Contains(text, uid):
 			uidLine = text[len(uid):]
 		case strings.Contains(text, gid):
 			gidLine = text[len(gid):]
 		}
-		if filtersLine != "" && stateLine != "" && uidLine != "" && gidLine != "" {
+		if stateLine != "" && uidLine != "" && gidLine != "" {
 			break
 		}
 	}
 
 	state, err := strconv.Atoi(stateLine)
-	if err != nil {
-		return nil, err
-	}
-	filters, err := strconv.Atoi(filtersLine)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +64,7 @@ func ParseProcessStatus(targetPID int) (*ProcessStatus, error) {
 		return nil, err
 	}
 
-	return &ProcessStatus{State: state, Filters: filters, Uid: puid, Gid: pgid}, nil
+	return &ProcessStatus{State: state, Uid: puid, Gid: pgid}, nil
 }
 
 // parseIdLine parses "Id"-like lines, read from the file
