@@ -60,47 +60,81 @@ func reexeced_main() error {
 		return err
 	}
 
-	hotdogBundleDir := filepath.Join(bundle, "hotdog")
+	hotdogBundleDir := filepath.Join(bundle, hotdog.HotdogBundleDir)
 	if err := os.Mkdir(hotdogBundleDir, 0755); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.PatchPath), filepath.Join(hotdogBundleDir, hotdog.PatchPath)); err != nil {
+	// Copy the artifacts used in the poststart hook with the specified
+	// permissions, so that child processes won't have the dumpable flag
+	// set
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.PatchPath), filepath.Join(hotdogBundleDir, hotdog.PatchPath), 0444); err != nil {
 		return err
 	}
-	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, hotdog.HotpatchBinary)); err != nil {
+	if err := cp(filepath.Join(hotdog.HostDir, hotdog.HotpatchBinary), filepath.Join(hotdogBundleDir, hotdog.HotpatchBinary), 0111); err != nil {
 		return err
+	}
+	// Attempt to create mount target, checking that each part of 'hotdog.ContainerDir'
+	// isn't a symlink
+	if err := preparePath(rootfs, hotdog.ContainerDir); err != nil {
+		return nil
 	}
 
 	mountTarget := filepath.Join(rootfs, hotdog.ContainerDir)
-	if stat, err := os.Stat(mountTarget); err != nil {
-		if _, ok := err.(*os.PathError); !ok {
-			// cannot hotpatch
-			return nil
-		}
-		if err := os.Mkdir(mountTarget, 0755); err != nil {
-			// cannot hotpatch
-			return nil
-		}
-	} else if !stat.IsDir() {
-		// cannot hotpatch
-		return nil
-	}
 	err = unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_BIND|unix.MS_NODEV|unix.MS_NOATIME|unix.MS_RELATIME, "")
 	if err != nil {
 		// cannot hotpatch
 		return nil
 	}
 	// remount readonly
-	return unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, "")
+	if err := unix.Mount(hotdogBundleDir, mountTarget, "bind", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
+		return err
+	}
+	// Create sentry file used by the poststart hook to check if the binaries
+	// were copied successfully
+	sentry, err := os.Create(filepath.Join(hotdogBundleDir, hotdog.PostStartHookSentry))
+	if err != nil {
+		return err
+	}
+	return sentry.Close()
 }
 
-func cp(in, out string) error {
+// preparePath creates the last directory in `path` under `root`, it returns
+// an error if any of the parent parts in `path` are not directories, or if `path`
+// exists.
+func preparePath(root string, path string) error {
+	fullPath := filepath.Join(root, path)
+	// We use lstat(2) since `fullPath` could be a symlink. With this call
+	// we read information about the link itself instead of the file the
+	// link points to.
+	if _, err := os.Lstat(fullPath); err == nil {
+		// Don't use the path if it already exists
+		return fmt.Errorf("Path exists: '%s'", fullPath)
+	} else {
+		// Fail if err is not `PathError`
+		if _, ok := err.(*os.PathError); !ok {
+			return err
+		}
+	}
+
+	for parent := filepath.Dir(fullPath); parent != root; parent = filepath.Dir(parent) {
+		// os.Lstat returns an error if the path doesn't exist
+		if stat, err := os.Lstat(parent); err != nil {
+			return err
+		} else if !stat.IsDir() {
+			// Fail if any parent is a symlink
+			return fmt.Errorf("Path '%s' is not a directory", parent)
+		}
+	}
+	return os.Mkdir(fullPath, 0755)
+}
+
+func cp(in, out string, mode os.FileMode) error {
 	inReader, err := os.OpenFile(in, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
 	defer inReader.Close()
-	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+	outWriter, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}

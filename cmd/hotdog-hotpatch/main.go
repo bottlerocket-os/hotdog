@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,8 @@ import (
 	"time"
 
 	"github.com/bottlerocket/hotdog"
+	"github.com/bottlerocket/hotdog/process"
+	"github.com/bottlerocket/hotdog/seccomp"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"kernel.org/pub/linux/libs/security/libcap/cap"
@@ -62,8 +63,19 @@ func main() {
 	}
 }
 
+const setFilterArgs = "set-filter"
+
 func _main() error {
-	logFile, err := os.OpenFile(filepath.Join("/", "dev", "shm", "hotdog.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if len(os.Args) > 2 && os.Args[1] == setFilterArgs {
+		return set_filters_main(os.Args[2:])
+	}
+	return hotpatch_main()
+}
+
+// hotpatch_main is the main function executed by the poststart hook, it
+// finds the processes to patch and applies the patch to them
+func hotpatch_main() error {
+	logFile, err := os.OpenFile(filepath.Join("/", "dev", "shm", "hotdog.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0655)
 	if err != nil {
 		return err
 	}
@@ -75,7 +87,6 @@ func _main() error {
 		logger.Printf("Failed to constrain hotdog's capabilities: %v", err)
 		return err
 	}
-
 	for _, d := range delays {
 		time.Sleep(d)
 		logger.Printf("Starting hotpatch after %v delay", d)
@@ -87,6 +98,36 @@ func _main() error {
 			}
 		}
 	}
+	return nil
+}
+
+// set_filters_main is the main function executed by hotdog-hotpatch's
+// reexec'ed process. It sets the seccomp filters for the forked process
+// before the final command is executed.
+func set_filters_main(args []string) error {
+	// Get the seccomp filters from the environment variable
+	filters, err := hotdog.GetFiltersFromEnv()
+	if err != nil {
+		return fmt.Errorf("failed to get filters from stdin: %v", err)
+	}
+	// Constrain this process' file descriptors
+	if err := process.ConstrainFileDescriptors(); err != nil {
+		return fmt.Errorf("failed to contrain the process file descriptors: %v", err)
+	}
+	// Set the seccomp filters before launching the final command
+	if err := seccomp.SetSeccompFilters(filters); err != nil {
+		return fmt.Errorf("failed to set filters: %v", err)
+	}
+	// Execute the command passed as arguments in the reexecution of
+	// 'hotdog-hotpatch'. It should be safe to attempt to execute a binary
+	// in here, since the caller process should already have reduced
+	// capabilities, and a seccomp filter was already set at this point.
+	command := exec.Command(args[0], args[1:]...)
+	out, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to execute command '%v': %s", args, string(out))
+	}
+	fmt.Print(string(out))
 	return nil
 }
 
@@ -142,6 +183,11 @@ func constrainHotdogCapabilities() error {
 			}
 		}
 	}
+
+	logger.Printf("Constraining file descriptors")
+	if err := process.ConstrainFileDescriptors(); err != nil {
+		return fmt.Errorf("failed to contrain the process file descriptors: %v", err)
+	}
 	return nil
 }
 
@@ -182,20 +228,21 @@ func findJVMs() []*jvm {
 			logger.Printf("Failed to readlink for %d", pid)
 			continue
 		}
-		euid, egid, err := findEUID(pid)
+		status, err := process.ParseProcessStatus(pid)
 		if err != nil {
 			logger.Printf("Failed to find EUID for %d: %v", pid, err)
+			continue
 		}
-		versionOut, err := commandDroppedPrivs(exePath, []string{"-version"}, euid, egid, pid)
+		versionOut, err := commandDroppedPrivs(exePath, []string{"-version"}, status.Uid, status.Gid, pid)
 		if err != nil {
-			logger.Printf("Failed to execute %q for %d: %v", "java -version", pid, err)
+			logger.Printf("Failed to execute %q for %d: %v, %q", "java -version", pid, err, string(versionOut))
 			continue
 		}
 		jvms = append(jvms, &jvm{
 			pid:     pid,
 			path:    exePath,
-			euid:    euid,
-			egid:    egid,
+			euid:    status.Uid,
+			egid:    status.Gid,
 			version: string(versionOut),
 		})
 	}
@@ -207,9 +254,13 @@ func findJVMs() []*jvm {
 // we drop all capabilities in every set including the bounding set.  For
 // programs run as UID 0, match the capability sets of the target process.
 // This allows the kernel's PTRACE_MODE_READ_FSCREDS check to pass when the
-// hotpatch attempts to find the JVM's socket by reading /proc/<pid>/root/.
+// hotpatch attempts to find the JVM's socket by reading /proc/<pid>/root/. The
+// seccomp filter of the target process is set for all programs.
 func commandDroppedPrivs(name string, arg []string, uid, gid, targetPID int) ([]byte, error) {
-	cmd := cap.NewLauncher(name, append([]string{name}, arg...), nil)
+	reexecPath := filepath.Join("/proc", "self", "exe")
+	// Create a launcher that reexecs hotdog-hotpatch, so that it can set the seccomp filters
+	// before launching the target command
+	cmd := cap.NewLauncher(reexecPath, append([]string{hotdog.HotpatchBinary, setFilterArgs, name}, arg...), nil)
 	if uid != 0 {
 		cmd.SetUID(uid)
 		cmd.SetMode(cap.ModeNoPriv)
@@ -230,7 +281,7 @@ func commandDroppedPrivs(name string, arg []string, uid, gid, targetPID int) ([]
 	}()
 	cmd.Callback(func(attr *syscall.ProcAttr, i interface{}) error {
 		// Capture stdout/stderr, since we can't rely on the exec package to
-		//do it for us here.
+		// do it for us here.
 		attr.Files[1] = pw.Fd()
 		attr.Files[2] = pw.Fd()
 
@@ -277,46 +328,6 @@ func commandDroppedPrivs(name string, arg []string, uid, gid, targetPID int) ([]
 
 	versionOut := buf.Bytes()
 	return versionOut, err
-}
-
-func findEUID(pid int) (int, int, error) {
-	status, err := os.OpenFile(filepath.Join("/proc", strconv.Itoa(pid), "status"), os.O_RDONLY, 0)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer status.Close()
-	scanner := bufio.NewScanner(status)
-	var (
-		uidLine string
-		gidLine string
-	)
-	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "Uid:") {
-			uidLine = scanner.Text()
-		}
-		if strings.HasPrefix(scanner.Text(), "Gid:") {
-			gidLine = scanner.Text()
-		}
-		if uidLine != "" && gidLine != "" {
-			break
-		}
-	}
-	if uidLine == "" || gidLine == "" {
-		return 0, 0, errors.New("not found")
-	}
-	uidLine = strings.TrimPrefix(uidLine, "Uid:\t")
-	uidStr := strings.SplitN(uidLine, "\t", 2)[0]
-	uid, err := strconv.Atoi(uidStr)
-	if err != nil {
-		return 0, 0, err
-	}
-	gidLine = strings.TrimPrefix(gidLine, "Gid:\t")
-	gidStr := strings.SplitN(gidLine, "\t", 2)[0]
-	gid, err := strconv.Atoi(gidStr)
-	if err != nil {
-		return 0, 0, err
-	}
-	return uid, gid, nil
 }
 
 func runHotpatch(j *jvm) error {
