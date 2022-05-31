@@ -1,0 +1,99 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam shadowing false
+skinparam ArrowFontSize 15
+skinparam sequenceMessageAlign direction
+
+skinparam sequence {
+    LifeLineBorderColor #e9becb
+    LifeLineBackgroundColor #ffffed
+	ParticipantFontSize 17
+}
+
+participant "container runtime"
+participant "container rootfs" << data >>
+participant bundle << data >>
+participant runc
+participant "hotdog-cc-hook"
+participant "hotdog-poststart-hook"
+participant nsenter
+participant "hotdog-hotpatch"
+participant "container main process"
+participant java
+
+== create container ==
+activate "container runtime"
+create "container rootfs"
+"container runtime" --> "container rootfs": create rootfs from image
+create bundle
+"container runtime" --> bundle: set up config
+create runc
+"container runtime" -> runc: create container
+activate runc
+runc --> "container rootfs": setup namespaces, mounts
+create "container main process"
+runc -> "container main process": re-exec runc inside namespaces and wait ($pid)
+create "hotdog-cc-hook"
+runc -> "hotdog-cc-hook": invoke ($pid)
+activate "hotdog-cc-hook"
+"hotdog-cc-hook" --> bundle: copy files to ${bundle}/hotdog
+create nsenter
+"hotdog-cc-hook" -> nsenter: enter container namespaces
+activate nsenter
+nsenter -> "container main process": find namespace fds
+nsenter -> "hotdog-cc-hook": re-exec inside container namespaces
+"hotdog-cc-hook" --> "container rootfs": mount ${bundle}/hotdog to ${rootfs}/dev/shm/.hotdog
+"hotdog-cc-hook" -> runc: complete
+deactivate nsenter
+deactivate "hotdog-cc-hook"
+runc -> "container runtime": created
+deactivate runc
+
+== start container ==
+"container runtime" -> runc: start container
+activate runc
+runc -> "container main process": start main process (entrypoint)
+activate "container main process"
+create java
+"container main process" -> java: run workload
+create "hotdog-poststart-hook"
+runc -> "hotdog-poststart-hook": invoke ($pid)
+activate "hotdog-poststart-hook"
+"hotdog-poststart-hook" --> bundle: lookup SELinux label and capabilities
+"hotdog-poststart-hook" --> "hotdog-poststart-hook": set SELinux label
+"hotdog-poststart-hook" -> nsenter: enter container namespaces
+activate nsenter
+"hotdog-poststart-hook" -> runc: complete
+deactivate "hotdog-poststart-hook"
+runc -> "container runtime": container started
+deactivate runc
+
+== container running ==
+
+create "hotdog-hotpatch"
+nsenter -> "hotdog-hotpatch": invoke ($capabilities)
+activate "hotdog-hotpatch"
+deactivate nsenter
+"hotdog-hotpatch" --> "hotdog-hotpatch": constrain capabilities
+
+loop "several times"
+"hotdog-hotpatch" --> "hotdog-hotpatch": find "java" processes
+note left of "hotdog-hotpatch"
+When invoking "java", match
+EUID/EGID and capabilities of
+the target process.
+end note
+"hotdog-hotpatch" -> java: run "java -version"
+"hotdog-hotpatch" -> java: inject hotpatch
+end
+
+deactivate "hotdog-hotpatch"
+java -> "container main process": exit
+"container main process" -> "container runtime": exit
+deactivate "container main process"
+@enduml
