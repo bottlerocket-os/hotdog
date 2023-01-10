@@ -36,7 +36,7 @@ func GetSeccompFilter(targetPID int) (allFilters [][]syscall.SockFilter, err err
 	}
 	// Fail if the target process isn't stopped
 	if !waitStatus.Stopped() {
-		return nil, fmt.Errorf("expected process '%d' to be stopped")
+		return nil, fmt.Errorf("expected process '%d' to be stopped", targetPID)
 	}
 
 	// Only attempt to detach if the target process was interrupted
