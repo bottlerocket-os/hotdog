@@ -4,6 +4,13 @@ Hotdog is a set of OCI hooks used to inject the
 [Log4j Hot Patch](https://github.com/corretto/hotpatch-for-apache-log4j2) into
 containers.
 
+:warning: Hotdog is very close to end-of-life.
+It has been twenty months since CVE-2021-44228 was discovered, and we expect that the vast majority of Java applications have been patched by this time.
+We're also not aware of any use of Hotdog outside of Bottlerocket, which no longer uses it.
+Therefore, we plan to end-of-life Hotdog by November 2023.
+Please [open an issue](https://github.com/bottlerocket-os/hotdog/issues/new) if this affects you.
+
+
 ## How it works
 
 When runc sets up the container, it invokes `hotdog-cc-hook`.  `hotdog-cc-hook`
